@@ -1,0 +1,49 @@
+name: Update Dashboard
+
+on:
+  schedule:
+    - cron: '0 9 1 * *'  # Runs at 9 AM UTC on the 1st of every month
+  workflow_dispatch:       # Allows manual runs from the Actions tab
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # needed to commit updated HTML back to the repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Download CSV and rebuild dashboard
+        run: python scripts/build_dashboard.py
+        env:
+          CSV_URL: ${{ vars.CSV_URL }}
+
+      - name: Commit and push if dashboard changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git diff --staged --quiet || git commit -m "chore: update dashboard $(date +'%Y-%m')"
+          git push
+
+      # Optional: deploy to GitHub Pages automatically.
+      # To enable this, go to Settings → Pages → Source and set it to
+      # "Deploy from a branch", branch: main, folder: /docs
+      # The step below is an alternative that uses the Actions-based Pages deploy.
+      #
+      # - name: Deploy to GitHub Pages
+      #   uses: peaceiris/actions-gh-pages@v4
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     publish_dir: ./docs
