@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medicaid Ex Parte Renewal Rates</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700;900&family=Source+Serif+4:opsz,wght@8..60,300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #141720;
+    --surface2: #1c2030;
+    --border: #252a3a;
+    --accent: #e8c547;
+    --accent2: #5b8cff;
+    --text: #e8eaf0;
+    --text-muted: #7a82a0;
+    --text-dim: #4a5070;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Serif 4', serif;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 28px 40px 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    background: var(--surface);
+  }
+
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.7rem;
+    font-weight: 900;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  header .subtitle {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    height: calc(100vh - 77px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+  }
+
+  .sidebar-section {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-section h3 {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .time-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .time-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 7px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a82a0'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+
+  select:focus { outline: none; border-color: var(--accent); }
+
+  .state-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .state-list-header h3 {
+    margin-bottom: 0;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 4px;
+  }
+
+  .btn-sm {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    padding: 3px 7px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+  .search-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 7px 10px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+
+  .search-input::placeholder { color: var(--text-dim); }
+  .search-input:focus { outline: none; border-color: var(--accent2); }
+
+  .state-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 8px;
+  }
+
+  .state-list::-webkit-scrollbar { width: 4px; }
+  .state-list::-webkit-scrollbar-track { background: transparent; }
+  .state-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .state-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 8px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    transition: all 0.12s;
+    text-align: left;
+    margin-bottom: 1px;
+  }
+
+  .state-btn:hover { background: var(--surface2); color: var(--text); }
+
+  .state-btn.active {
+    color: var(--text);
+    background: var(--surface2);
+    border-color: var(--border);
+  }
+
+  .color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    opacity: 0.3;
+    transition: opacity 0.12s;
+  }
+
+  .state-btn.active .color-dot { opacity: 1; }
+
+  .state-name { flex: 1; }
+
+  .state-latest {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+  }
+
+  .state-btn.active .state-latest { color: var(--text-muted); }
+
+  /* Chart area */
+  .chart-area {
+    display: flex;
+    flex-direction: column;
+    padding: 32px 40px;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .selected-count {
+    color: var(--accent);
+    font-size: 0.65rem;
+  }
+
+  .chart-container {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+  }
+
+  .empty-icon { font-size: 2rem; opacity: 0.3; }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+  }
+
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .stat-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; height: auto; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); height: 600px; max-height: 600px; }
+    .chart-area { height: auto; }
+    header { padding: 20px; flex-direction: column; gap: 4px; }
+    .chart-area { padding: 20px; }
+    .chart-container { height: 400px; flex: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Medicaid Ex Parte Renewal Rates</h1>
+  <span class="subtitle">State-level data · 2023–2025</span>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <h3>Time Range</h3>
+      <div class="time-controls">
+        <div>
+          <div class="time-label">From</div>
+          <select id="startMonth"></select>
+        </div>
+        <div>
+          <div class="time-label">To</div>
+          <select id="endMonth"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="state-list-header">
+        <h3>States</h3>
+        <div class="btn-group">
+          <button class="btn-sm" id="btnAll">All</button>
+          <button class="btn-sm" id="btnNone">None</button>
+        </div>
+      </div>
+      <input class="search-input" type="text" id="stateSearch" placeholder="Search states…">
+    </div>
+
+    <div class="state-list" id="stateList"></div>
+  </div>
+
+  <div class="chart-area">
+    <div class="chart-wrap">
+      <div class="chart-title">
+        <span>Ex Parte Rate Over Time (%)</span>
+        <span class="selected-count" id="chartSelCount"></span>
+      </div>
+      <div class="chart-container">
+        <canvas id="myChart"></canvas>
+        <div class="empty-state" id="emptyState" style="display:none">
+          <div class="empty-icon">◻</div>
+          <div>Select states from the sidebar to begin</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ DATA ============
+// INJECT_DATA_START
+const INJECTED = null; // replaced at build time
+// INJECT_DATA_END
+
+const states = INJECTED.states;
+const allRows = INJECTED.rows;
+
+// Date labels
+const allMonths = allRows.map(r => r.date);
+const allMonthKeys = allRows.map(r => r.month);
+
+// Color palette
+const palette = [
+  '#e8c547','#5b8cff','#ff6b6b','#4ecdc4','#f7a35c','#a29bfe','#fd79a8',
+  '#00b894','#fdcb6e','#74b9ff','#e17055','#55efc4','#fab1a0','#0984e3',
+  '#b2bec3','#6c5ce7','#00cec9','#d63031','#2d3436','#81ecec',
+  '#e84393','#00b4d8','#f72585','#7209b7','#3a0ca3','#4cc9f0','#06d6a0',
+  '#ffd166','#ef476f','#118ab2','#073b4c','#8338ec','#3a86ff','#fb5607',
+  '#ffbe0b','#8ecae6','#219ebc','#023047','#ffb703','#fb8500','#9bf6ff',
+  '#caffbf','#ffd6ff','#bde0fe','#a2d2ff','#cdb4db','#ffc8dd','#ffafcc',
+  '#80b918','#38b000','#70e000'
+];
+
+// State -> color mapping
+const stateColor = {};
+states.forEach((s, i) => { stateColor[s] = palette[i % palette.length]; });
+
+// Active states (default: none, user picks)
+const activeStates = new Set();
+
+// Time range
+let startIdx = 0;
+let endIdx = allRows.length - 1;
+
+// ============ BUILD UI ============
+
+// Populate dropdowns
+const startSel = document.getElementById('startMonth');
+const endSel = document.getElementById('endMonth');
+
+allRows.forEach((r, i) => {
+  const opt1 = new Option(r.date, i);
+  const opt2 = new Option(r.date, i);
+  startSel.add(opt1);
+  endSel.add(opt2);
+});
+endSel.value = allRows.length - 1;
+
+startSel.addEventListener('change', () => {
+  startIdx = parseInt(startSel.value);
+  if (startIdx > endIdx) { endIdx = startIdx; endSel.value = endIdx; }
+  updateChart();
+});
+endSel.addEventListener('change', () => {
+  endIdx = parseInt(endSel.value);
+  if (endIdx < startIdx) { startIdx = endIdx; startSel.value = startIdx; }
+  updateChart();
+});
+
+// State list
+const stateList = document.getElementById('stateList');
+
+function renderStateList(filter = '') {
+  stateList.innerHTML = '';
+  states
+    .filter(s => s.toLowerCase().includes(filter.toLowerCase()))
+    .forEach(s => {
+      const isActive = activeStates.has(s);
+      // Latest value
+      let latest = null;
+      for (let i = allRows.length - 1; i >= 0; i--) {
+        if (allRows[i][s] !== null) { latest = allRows[i][s]; break; }
+      }
+      const btn = document.createElement('button');
+      btn.className = 'state-btn' + (isActive ? ' active' : '');
+      btn.innerHTML = `
+        <span class="color-dot" style="background:${stateColor[s]}"></span>
+        <span class="state-name">${s}</span>
+        <span class="state-latest">${latest !== null ? latest.toFixed(1)+'%' : '—'}</span>
+      `;
+      btn.addEventListener('click', () => {
+        if (activeStates.has(s)) activeStates.delete(s);
+        else activeStates.add(s);
+        renderStateList(document.getElementById('stateSearch').value);
+        updateChart();
+      });
+      stateList.appendChild(btn);
+    });
+}
+
+document.getElementById('stateSearch').addEventListener('input', e => {
+  renderStateList(e.target.value);
+});
+
+document.getElementById('btnAll').addEventListener('click', () => {
+  states.forEach(s => activeStates.add(s));
+  renderStateList(document.getElementById('stateSearch').value);
+  updateChart();
+});
+
+document.getElementById('btnNone').addEventListener('click', () => {
+  activeStates.clear();
+  renderStateList(document.getElementById('stateSearch').value);
+  updateChart();
+});
+
+renderStateList();
+
+// ============ CHART ============
+const ctx = document.getElementById('myChart').getContext('2d');
+const myChart = new Chart(ctx, {
+  type: 'line',
+  data: { labels: [], datasets: [] },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 200 },
+    interaction: { mode: 'nearest', intersect: true },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1c2030',
+        borderColor: '#252a3a',
+        borderWidth: 1,
+        titleColor: '#7a82a0',
+        titleFont: { family: 'DM Mono', size: 11 },
+        bodyColor: '#e8eaf0',
+        bodyFont: { family: 'DM Mono', size: 11 },
+        padding: 12,
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1)+'%' : '—'}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: '#1c2030' },
+        ticks: {
+          color: '#4a5070',
+          font: { family: 'DM Mono', size: 10 },
+          maxRotation: 45
+        }
+      },
+      y: {
+        min: 0,
+        max: 105,
+        grid: { color: '#1c2030' },
+        ticks: {
+          color: '#4a5070',
+          font: { family: 'DM Mono', size: 10 },
+          callback: v => v + '%'
+        }
+      }
+    }
+  }
+});
+
+function updateChart() {
+  const visibleRows = allRows.slice(startIdx, endIdx + 1);
+  const labels = visibleRows.map(r => r.date);
+  const selArr = Array.from(activeStates);
+
+  document.getElementById('emptyState').style.display = selArr.length === 0 ? 'flex' : 'none';
+  document.getElementById('chartSelCount').textContent = selArr.length > 0 ? `${selArr.length} state${selArr.length !== 1 ? 's' : ''} selected` : '';
+
+  const datasets = selArr.map(s => ({
+    label: s,
+    data: visibleRows.map(r => r[s]),
+    borderColor: stateColor[s],
+    backgroundColor: stateColor[s] + '18',
+    borderWidth: 1.8,
+    pointRadius: visibleRows.length > 15 ? 2 : 3.5,
+    pointHoverRadius: 5,
+    tension: 0.3,
+    spanGaps: true
+  }));
+
+  myChart.data.labels = labels;
+  myChart.data.datasets = datasets;
+  myChart.update();
+}
+
+updateChart();
+</script>
+</body>
+</html>
