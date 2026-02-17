@@ -1,12 +1,10 @@
 """
 build_dashboard.py
 
-Downloads the CMS Medicaid renewal CSV, computes ex parte rates from
-"Updated" (U) rows only, and injects the result into dashboard_template.html,
-writing the final output to docs/index.html.
-
-Environment variables:
-  CSV_URL  - URL to download the raw CSV from (set as a GitHub repo variable)
+Fetches the current CSV download URL from the CMS Medicaid dataset API,
+downloads the CSV, computes ex parte rates from "Updated" (U) rows only,
+and injects the result into dashboard_template.html, writing the final
+output to docs/index.html.
 
 Usage:
   python scripts/build_dashboard.py
@@ -21,6 +19,31 @@ from collections import defaultdict
 from io import StringIO
 
 import requests
+
+METADATA_URL = (
+    "https://data.medicaid.gov/api/1/metastore/schemas/dataset/items"
+    "/5abea2e0-3f8e-4b49-a50d-d63d5fd9103c?show-reference-ids=false"
+)
+
+
+def get_csv_url() -> str:
+    """Fetch the dataset metadata and extract the current CSV download URL."""
+    print("Fetching dataset metadata from Medicaid API ...")
+    response = requests.get(METADATA_URL, timeout=30)
+    response.raise_for_status()
+    metadata = response.json()
+
+    try:
+        csv_url = metadata["distribution"][0]["data"]["downloadURL"]
+    except (KeyError, IndexError, TypeError) as e:
+        raise RuntimeError(
+            f"Could not find downloadURL in API response. "
+            f"Response structure may have changed. Error: {e}\n"
+            f"Response snippet: {json.dumps(metadata, indent=2)[:500]}"
+        )
+
+    print(f"  Found CSV URL: {csv_url}")
+    return csv_url
 
 
 def download_csv(url: str) -> str:
@@ -115,15 +138,11 @@ def build_html(data: dict, template_path: str, output_path: str) -> None:
 
 
 def main() -> None:
-    csv_url = os.environ.get("CSV_URL")
-    if not csv_url:
-        print("ERROR: CSV_URL environment variable is not set.", file=sys.stderr)
-        sys.exit(1)
-
     # Paths are relative to repo root (where the Action runs from)
     template_path = "scripts/dashboard_template.html"
     output_path = "docs/index.html"
 
+    csv_url = get_csv_url()
     raw_csv = download_csv(csv_url)
     data = parse_csv(raw_csv)
     build_html(data, template_path, output_path)
