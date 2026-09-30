@@ -56,28 +56,42 @@ def download_csv(url: str) -> str:
 
 def parse_csv(raw: str) -> dict:
     """
+    # First pass: collect all rows keyed by (month, state), preferring "U" over "O"
     Parse the raw CMS CSV and return a dict with:
+    data: dict[tuple, dict] = {}
       - states: sorted list of state abbreviations
       - rows:   list of dicts keyed by state abbrev + 'month' + 'date'
-
     Rules:
       - Only rows where "Original or Updated" == "U" are used
       - Ex parte rate = "Beneficiaries Whose Coverage Was Renewed on an Ex Parte Basis"
                         / "Beneficiaries with a Renewal Due" * 100
       - Rows missing either value are recorded as null
     """
+  
+    # First pass: collect all rows keyed by (month, state), preferring "U" over "O"
+    data: dict[tuple, dict] = {}
+
+    reader = csv.DictReader(StringIO(raw))
+    for row in reader:
+        flag = row["Original or Updated"].strip()
+        if flag not in ("O", "U"):
+            continue
+
+        state = row["State Abbreviation"].strip()
+        month = row["Reporting Period"].strip()
+        key = (month, state)
+
+        # "U" always wins; only store "O" if we haven't seen a "U" yet
+        if flag == "U" or key not in data:
+            data[key] = row
+
+    # Second pass: compute rates from the winning rows
     rows_by_month: dict[str, dict[str, float | None]] = defaultdict(dict)
     month_dates: dict[str, str] = {}
     states_seen: set[str] = set()
     months_seen: set[str] = set()
 
-    reader = csv.DictReader(StringIO(raw))
-    for row in reader:
-        if row["Original or Updated"].strip() != "U":
-            continue
-
-        state = row["State Abbreviation"].strip()
-        month = row["Reporting Period"].strip()
+    for (month, state), row in data.items():
         renewal_due = row["Beneficiaries with a Renewal Due"].strip()
         ex_parte = row[
             "Beneficiaries Whose Coverage Was Renewed on an Ex Parte Basis"
@@ -86,7 +100,6 @@ def parse_csv(raw: str) -> dict:
         states_seen.add(state)
         months_seen.add(month)
 
-        # Build a human-readable date label e.g. "3/1/2023"
         year = month[:4]
         mon = str(int(month[4:]))
         month_dates[month] = f"{mon}/1/{year}"
@@ -115,7 +128,6 @@ def parse_csv(raw: str) -> dict:
         f"({months[0]}–{months[-1]})"
     )
     return {"states": states, "rows": all_rows}
-
 
 def build_html(data: dict, template_path: str, output_path: str) -> None:
     with open(template_path, encoding="utf-8") as f:
